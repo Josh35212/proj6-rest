@@ -1,0 +1,27 @@
+version: '3'
+services:
+  db:
+    image: mongo:latest
+    container_name: brevet-mongodb
+    volumes:
+      - mongodb-data:/data/db
+  
+  api-service:
+    build: ./DockerMongo
+    container_name: brevet-api
+    ports:
+      - "5001:5000"
+    depends_on:
+      - db
+    environment:
+      - DB_PORT_27017_TCP_ADDR=db
+
+  consumer:
+    build: ./Consumer
+    container_name: brevet-consumer
+    ports:
+      - "8080:80"
+    depends_on:
+     - api-service
+volumes:
+  mongodb-data:

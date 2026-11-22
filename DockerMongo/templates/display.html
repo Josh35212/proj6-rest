@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Stored Brevet Times</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Stored ACP Brevet Times</h1>
+            <div class="row">
+                <div class="col-md-12">
+                    <table class="table table-bordered">
+                        <thead>
+                        <tr>
+                            <th>Km</th>
+                            <th>Open</th>
+                            <th>Close</th>
+                        </tr>
+                        </thead>
+                        <tbody id="times_table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <script type="text/javascript">
+
+            var SCRIPT_ROOT = {{ request.script_root|tojson|safe }} ;
+            var FETCH_URL = SCRIPT_ROOT + "/fetch";
+
+            $(document).ready(function() {
+                $.ajax({
+                    type: "GET",
+                    url: FETCH_URL,
+                    success: function(response) {
+                        console.log("Fetched times: ", response);
+                        if (response.times.length === 0) {
+                            $("#times_table").append(
+                                $("<tr>").append(
+                                    $("<td>").text("No stored times found")
+                                )
+                            );
+                            return;
+                        }
+                        $.each(response.times, function(index, control) {
+                            var row = $("<tr>");
+                            row.append($("<td>").text(control.km));
+                            row.append($("<td>").text(control.open));
+                            row.append($("<td>").text(control.close));
+                            $("#times_table").append(row);
+                        });
+                    },
+                    error: function(xhr) {
+                        console.log("Fetch failed: ", xhr.responseJSON);
+                        $("#times_table").append(
+                            $("<tr>").append(
+                                $("<td>").text("Unable to load store times")
+                            )
+                        );
+                    }
+                });
+            });
+        </script>
+    </body>
+</html>

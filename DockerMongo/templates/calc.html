@@ -1,0 +1,271 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>ACP Controle Times</title>
+
+  <!-- 'viewport' is used by bootstrap to respond to device size -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Javascript:  JQuery from a content distribution network (CDN) -->
+  <script
+     src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">
+  </script>
+
+  <!-- Bootstrap includes javascript and css  (must follow jquery) -->
+  <link rel="stylesheet"
+   href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+   <script
+    src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js">
+   </script>
+
+  <!-- moment.js is the JavaScript equivalent of arrow.py -->
+  <script 
+    src="{{ url_for('static', filename="js/moment.min.js") }}"></script>
+
+</head>
+
+   <!-- Our own style sheet -->
+   <link rel="stylesheet" href="/static/css/calc.css" />
+
+<body>
+<!-- bootstrap requires a 'container' div around content -->
+<div class="container">
+
+<h1>ACP Brevet Times</h1>
+  <p>This worksheet is for ACP-sanctioned brevets between 200 and 1000 kilometers</p>
+
+  <!--
+  -- If there are any warnings or other messages from a prior
+  -- request to the server, 
+  -- they appear above the rest of the content, just until the next 
+  -- action.  (This is only on request/response transactions that
+  -- result in regenerating the page, not on every xmlhttp request.) 
+  -->
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class=flashes>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+<!-- Design on bootstrap grid -->
+<form role="form">
+<div class="row">
+  <div class="col-md-4">
+    <label>Distance</label>
+  <select name="distance" id="brevet_dist_km">
+    <option value="200">200km</option>
+    <option value="300">300km</option>
+    <option value="400">400km</option>
+    <option value="600">600km</option>
+    <option value="1000">1000km</option>
+  </select>
+  </div> <!-- columns 1--4  -->
+  <div class="col-md-6">
+    <label>Begins at</label>
+    <input type=date name="begin_date" id="begin_date" value="2017-01-01" />
+    <input type=time name="begin_time" id="begin_time" value="00:00"    />
+  </div> <!-- columns 5-10 -->
+  </div> <!-- row -->
+
+  <br />  <!-- Cosmetic -- a little vertical space -->
+  <!-- Although we do not use tables for general page layout, they are
+       appropriate for something that really is a table, like this
+       one.  We allocate it the full 12 columns of the bootstrap grid.
+  -->
+  <div class="row">
+  <div class="col-md-12"> 
+  <table class="control_time_table">
+      <tr>
+	<th> Miles </th>
+	<th> Km </th>
+	<th>Location</th>
+	<th>Open</th>
+	<th>Close</th>
+	<th>Notes</th>
+      </tr>
+   {% for row in range(20) %}
+    <tr class="control">
+      <!-- Dist (mi) -->
+      <td><input name="miles" type="number" 
+           min="0" max="900" size="5" /></td>
+      <!-- Dist (km) -->
+      <td><input name="km" type="text"
+	   min="0" max="1100" size="5" /> </td>
+      <!-- Location (optional) -->
+      <td><input name="location" type="text" 
+        placeholder="Optional location name"
+	size="20" /> </td>
+      <!-- Open time (read only, set by JavaScript function -->
+      <td><input name="open" type="datetime" value="" readonly /></td>
+      <!-- Close time (read only, set by JavaScript function -->
+      <td><input name="close" type="datetime" value="" readonly /></td>
+      <!-- Notes (error messages for this row) -->
+      <td class="notes"> &nbsp; </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div> <!-- col -->
+  </div> <!-- row -->
+  
+  <!--Buttons-->
+  <div class="row">
+    <div class="col-md-12">
+      <button type="button" id="submit_times" class="btn btn-default">
+        Submit
+      </button>
+      <button type="button" id="display_times" class="btn btn-default">
+        Display
+      </button>
+      <span id="submit_status"></span>
+    </div>
+  </div>
+
+</form>
+
+<script type="text/javascript">
+
+  var SCRIPT_ROOT = {{ request.script_root|tojson|safe }} ;
+  var TIME_CALC_URL = SCRIPT_ROOT + "/_calc_times";
+  var INSERT_URL = SCRIPT_ROOT + "/insert";
+  var FETCH_URL = SCRIPT_ROOT + "/fetch";
+
+  // Pass calctimes a <td> element containing the data for a control.
+  // It extracts the distance and calls the server to get times to
+  // fill in open and close times in a human-readable format.
+  // (If we want to also keep the ISO-formatted times, we'll need to
+  // stash them in hidden fields.) 
+  function calc_times(control) {
+    var km = control.find("input[name='km']").val();
+    var brevet_dist = $("#brevet_dist_km").val();
+    var begin_date = $("#begin_date").val();
+    var begin_time = $("#begin_time").val();
+    var open_time_field = control.find("input[name='open']");
+    var close_time_field = control.find("input[name='close']");
+    
+    $.getJSON(TIME_CALC_URL, {
+        km: km,
+        distance: brevet_dist,
+        begin_date: begin_date,
+        begin_time: begin_time
+    },
+      // response handler
+      function(data) {
+         var times = data.result;
+         console.log("Got a response: " +  times);
+         console.log("Response.open = " + times.open);
+         open_time_field.val(moment.utc(times.open).format("ddd M/D H:mm"));
+         close_time_field.val(moment.utc(times.close).format("ddd M/D H:mm"));
+         // Clear a previous error message on success
+         control.find(".notes").text("")
+       } // end of handler function
+    )
+    .fail(function() {
+        // If AJAX request fails -> clear open and close time -> display error
+        open_time_field.val("");
+        close_time_field.val("");
+        control.find(".notes").text("Failed to calculate times");
+    });
+  }
+
+  $(document).ready(function(){
+    // Do the following when the page is finished loading
+
+    $('input[name="miles"]').change(
+        function() {
+            var miles = parseFloat($(this).val());
+            var km = (1.609344 * miles).toFixed(1) ;
+            console.log("Converted " + miles + " miles to " + km + " kilometers");
+            var control_entry = $(this).parents(".control")
+            var target = control_entry.find("input[name='km']");
+            target.val( km );
+            // Then calculate times for this entry
+            calc_times(control_entry);
+        });
+
+    $('input[name="km"]').change(
+        function() {
+            var km = parseFloat($(this).val());
+            var miles = (0.621371 * km).toFixed(1) ;
+            console.log("Converted " + km + " km to " + miles + " miles");
+            var control_entry = $(this).parents(".control")
+            var target = control_entry.find("input[name='miles']");
+            target.val( miles );
+            // Then calculate times for this entry
+            calc_times(control_entry);
+        });
+
+    // --------------------Submit Button--------------------
+    
+    // Keeps track of double submits
+    var lastSubmittedControls = null;
+
+    $("#submit_times").click(
+        function() {
+            var controls = [];
+            $(".control").each(function() {
+                var row = $(this);
+                var km = row.find("input[name='km']").val();
+                var open = row.find("input[name='open']").val();
+                var close = row.find("input[name='close']").val();
+                console.log("Control: " + km + ", Open: " + open + ", Close: " + close);
+                // Only add non empty rows into the controls list
+                if (km !== "") {
+                    controls.push({
+                        km: km,
+                        open: open,
+                        close: close
+                    });
+                }
+            });
+
+            // Check if there are controls to submit
+            console.log(controls);
+            if (controls.length === 0) {
+                $("#submit_status").text("No control times to submit")
+                return;
+            }
+
+            // Check for double submits
+            if (JSON.stringify(controls) === JSON.stringify(lastSubmittedControls)) {
+                $("#submit_status").text("These control times have already been submitted");
+                return;
+            }
+
+            $.ajax({
+                type: "POST",
+                url: INSERT_URL,
+                data: JSON.stringify(controls),
+                contentType: "application/json",
+                success: function(response) {
+                    console.log("Submission successful: ", response);
+                    lastSubmittedControls = controls;
+                    $("#submit_status").text("Control times successfully saved")
+                },
+                error: function(xhr) {
+                    console.log("Submission failed: ", xhr.responseJSON);
+                    var message = "Failed to save control times";
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        message = xhr.responseJSON.error;
+                    }
+                    $("#submit_status").text(message);
+                }
+            });
+        });
+
+    // --------------------Display Button--------------------
+
+    $("#display_times").click(
+        function() {
+            window.location.href = SCRIPT_ROOT + "/display";
+        });
+
+  });   // end of what we do on document ready
+
+</script>
+
+</div>
+</body> </html>
